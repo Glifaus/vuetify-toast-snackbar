@@ -1,7 +1,7 @@
 <template>
   <v-snackbar :timeout="timeout" :color="color" :bottom="y === 'bottom'" :top="y === 'top'" :left="x === 'left'"
-    :right="x === 'right'" :multi-line="multiLine" :vertical="vertical" v-model="active" class="vts" :class="classes"
-    @click="dismiss" role="alert">
+    :right="x === 'right'" :multi-line="multiLine" :vertical="vertical" v-model="active" class="v-application vts"
+    :class="classes" @click="dismiss" role="alert">
     <v-icon dark left v-if="!!icon" class="vts__icon" :color="iconColor">
       {{ icon }}
     </v-icon>

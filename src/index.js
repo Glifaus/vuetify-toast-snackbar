@@ -1,88 +1,96 @@
 import Toast from "./Toast.vue";
 
 function init(Vue, globalOptions = {}) {
-  let currentToastInstance = null;
-  const toastQueue = [];
-  const defaultProperty = globalOptions.property || "$toast";
+  let cmp = null;
+  const queue = [];
+  const property = globalOptions.property || "$toast";
 
-  function createToastInstance(options) {
-    const toastComponent = new Vue(Toast);
-    const finalOptions = {
-      ...Vue.prototype[defaultProperty].globalOptions,
+  function createCmp(options) {
+    const component = new Vue(Toast);
+    const componentOptions = {
+      ...Vue.prototype[property].globalOptions,
       ...options,
     };
 
-    if (finalOptions.slot) {
-      toastComponent.$slots.default = finalOptions.slot;
-      delete finalOptions.slot;
+    if (componentOptions.slot) {
+      component.$slots.default = componentOptions.slot;
+      delete componentOptions.slot;
     }
 
-    Object.assign(toastComponent, finalOptions);
-    document.body.appendChild(toastComponent.$mount().$el);
+    Object.assign(component, componentOptions);
+    document.body.appendChild(component.$mount().$el);
 
-    return toastComponent;
+    return component;
   }
 
-  function showToast(message, options = {}) {
-    if (currentToastInstance) {
+  function show(message, options = {}) {
+    if (cmp) {
       const isQueueable =
         options.queueable !== undefined
           ? options.queueable
           : globalOptions.queueable;
 
       if (isQueueable) {
-        toastQueue.push({ message, options });
+        queue.push({ message, options });
       } else {
-        currentToastInstance.close();
-        toastQueue.unshift({ message, options });
+        cmp.close();
+        queue.unshift({ message, options });
       }
 
       return;
     }
 
     options.message = message;
-    currentToastInstance = createToastInstance(options);
-    currentToastInstance.$on("statusChange", (isActive, wasActive) => {
+    cmp = createCmp(options);
+    cmp.$on("statusChange", (isActive, wasActive) => {
       if (wasActive && !isActive) {
-        currentToastInstance.$nextTick(() => {
-          currentToastInstance.$destroy();
-          currentToastInstance = null;
+        cmp.$nextTick(() => {
+          cmp.$destroy();
+          cmp = null;
 
-          if (toastQueue.length) {
-            const nextToast = toastQueue.shift();
-            showToast(nextToast.message, nextToast.options);
+          if (queue.length) {
+            const toast = queue.shift();
+            show(toast.message, toast.options);
           }
         });
       }
     });
   }
 
-  function createShortcutMethods(options) {
+  function shorts(options) {
     const colors = ["success", "info", "error", "warning"];
-    const shortcutMethods = {};
+    const methods = {};
 
     colors.forEach((color) => {
-      shortcutMethods[color] = (message, opts) =>
-        showToast(message, { color, ...opts });
+      methods[color] = (message, options) =>
+        show(message, { color, ...options });
     });
 
     if (options.shorts) {
-      Object.entries(options.shorts).forEach(([key, localOptions]) => {
-        shortcutMethods[key] = (message, opts) =>
-          showToast(message, { ...localOptions, ...opts });
-      });
+      for (let key in options.shorts) {
+        const localOptions = options.shorts[key];
+        methods[key] = (message, options) =>
+          show(message, { ...localOptions, ...options });
+      }
     }
 
-    return shortcutMethods;
+    return methods;
   }
 
-  Vue.prototype[defaultProperty] = {
-    ...createShortcutMethods(globalOptions),
+  function getCmp() {
+    return cmp;
+  }
+
+  function clearQueue() {
+    return queue.splice(0, queue.length);
+  }
+
+  Vue.prototype[property] = Object.assign(show, {
     globalOptions,
-    show: showToast,
-    getCmp: () => currentToastInstance,
-    clearQueue: () => toastQueue.splice(0, toastQueue.length),
-  };
+    getCmp,
+    clearQueue,
+    ...shorts(globalOptions),
+  });
 }
 
 if (typeof window !== "undefined" && window.Vue) {
