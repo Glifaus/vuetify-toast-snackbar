@@ -1,93 +1,92 @@
-import Toast from './Toast.vue'
+import Toast from "./Toast.vue";
 
 function init(Vue, globalOptions = {}) {
-  let cmp = null
-  const queue = []
-  const property = globalOptions.property || '$toast'
+  let currentToastInstance = null;
+  const toastQueue = [];
+  const defaultProperty = globalOptions.property || "$toast";
 
-  function createCmp(options) {
-    const component = new Vue(Toast)
-    const componentOptions = { ...Vue.prototype[property].globalOptions, ...options }
+  function createToastInstance(options) {
+    const toastComponent = new Vue(Toast);
+    const finalOptions = {
+      ...Vue.prototype[defaultProperty].globalOptions,
+      ...options,
+    };
 
-    if (componentOptions.slot) {
-      component.$slots.default = componentOptions.slot
-      delete componentOptions.slot
+    if (finalOptions.slot) {
+      toastComponent.$slots.default = finalOptions.slot;
+      delete finalOptions.slot;
     }
 
-    Object.assign(component, componentOptions)
-    document.body.appendChild(component.$mount().$el)
+    Object.assign(toastComponent, finalOptions);
+    document.body.appendChild(toastComponent.$mount().$el);
 
-    return component
+    return toastComponent;
   }
 
-  function show(message, options = {}) {
-    if (cmp) {
-      const isQueueable = options.queueable !== undefined ? options.queueable : globalOptions.queueable
+  function showToast(message, options = {}) {
+    if (currentToastInstance) {
+      const isQueueable =
+        options.queueable !== undefined
+          ? options.queueable
+          : globalOptions.queueable;
 
       if (isQueueable) {
-        queue.push({ message, options })
-      }
-      else {
-        cmp.close()
-        queue.unshift({ message, options })
+        toastQueue.push({ message, options });
+      } else {
+        currentToastInstance.close();
+        toastQueue.unshift({ message, options });
       }
 
-      return
+      return;
     }
 
-    options.message = message
-    cmp = createCmp(options)
-    cmp.$on('statusChange', (isActive, wasActive) => {
+    options.message = message;
+    currentToastInstance = createToastInstance(options);
+    currentToastInstance.$on("statusChange", (isActive, wasActive) => {
       if (wasActive && !isActive) {
-        cmp.$nextTick(() => {
-          cmp.$destroy()
-          cmp = null
+        currentToastInstance.$nextTick(() => {
+          currentToastInstance.$destroy();
+          currentToastInstance = null;
 
-          if (queue.length) {
-            const toast = queue.shift()
-            show(toast.message, toast.options)
+          if (toastQueue.length) {
+            const nextToast = toastQueue.shift();
+            showToast(nextToast.message, nextToast.options);
           }
-        })
+        });
       }
-    })
+    });
   }
 
-  function shorts(options) {
-    const colors = ['success', 'info', 'error', 'warning']
-    const methods = {}
+  function createShortcutMethods(options) {
+    const colors = ["success", "info", "error", "warning"];
+    const shortcutMethods = {};
 
-    colors.forEach(color => {
-      methods[color] = (message, options) => show(message, { color, ...options })
-    })
+    colors.forEach((color) => {
+      shortcutMethods[color] = (message, opts) =>
+        showToast(message, { color, ...opts });
+    });
 
     if (options.shorts) {
-      for (let key in options.shorts) {
-        const localOptions = options.shorts[key]
-        methods[key] = (message, options) => show(message, { ...localOptions, ...options })
-      }
+      Object.entries(options.shorts).forEach(([key, localOptions]) => {
+        shortcutMethods[key] = (message, opts) =>
+          showToast(message, { ...localOptions, ...opts });
+      });
     }
 
-    return methods
+    return shortcutMethods;
   }
 
-  function getCmp() {
-    return cmp
-  }
-
-  function clearQueue() {
-    return queue.splice(0, queue.length)
-  }
-
-  Vue.prototype[property] = Object.assign(show, {
+  Vue.prototype[defaultProperty] = {
+    ...createShortcutMethods(globalOptions),
     globalOptions,
-    getCmp,
-    clearQueue,
-    ...shorts(globalOptions)
-  })
+    show: showToast,
+    getCmp: () => currentToastInstance,
+    clearQueue: () => toastQueue.splice(0, toastQueue.length),
+  };
 }
 
-if (typeof window !== 'undefined' && window.Vue) {
-  window.Vue.use(init)
+if (typeof window !== "undefined" && window.Vue) {
+  window.Vue.use(init);
 }
 
-export default init
+export default init;
